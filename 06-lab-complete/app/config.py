@@ -29,16 +29,24 @@ class Settings:
 
     # Rate limiting
     rate_limit_per_minute: int = field(
-        default_factory=lambda: int(os.getenv("RATE_LIMIT_PER_MINUTE", "20"))
+        default_factory=lambda: int(os.getenv("RATE_LIMIT_PER_MINUTE", "10"))
     )
 
     # Budget
-    daily_budget_usd: float = field(
-        default_factory=lambda: float(os.getenv("DAILY_BUDGET_USD", "5.0"))
+    monthly_budget_usd: float = field(
+        default_factory=lambda: float(
+            os.getenv("MONTHLY_BUDGET_USD", os.getenv("DAILY_BUDGET_USD", "10.0"))
+        )
     )
 
     # Storage
     redis_url: str = field(default_factory=lambda: os.getenv("REDIS_URL", ""))
+    session_ttl_seconds: int = field(
+        default_factory=lambda: int(os.getenv("SESSION_TTL_SECONDS", "3600"))
+    )
+    max_history_messages: int = field(
+        default_factory=lambda: int(os.getenv("MAX_HISTORY_MESSAGES", "20"))
+    )
 
     def validate(self):
         logger = logging.getLogger(__name__)

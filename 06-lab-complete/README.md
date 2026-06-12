@@ -1,100 +1,160 @@
-# Lab 12 — Complete Production Agent
+# Lab 12 - Complete Production Agent
 
-Kết hợp TẤT CẢ những gì đã học trong 1 project hoàn chỉnh.
+This project combines the Day 12 deployment requirements with the Day 9 legal
+multi-agent system design.
 
-## Checklist Deliverable
+The Day 9 source used as inspiration is:
 
-- [x] Dockerfile (multi-stage, < 500 MB)
-- [x] docker-compose.yml (agent + redis)
-- [x] .dockerignore
-- [x] Health check endpoint (`GET /health`)
-- [x] Readiness endpoint (`GET /ready`)
-- [x] API Key authentication
-- [x] Rate limiting
-- [x] Cost guard
-- [x] Config từ environment variables
-- [x] Structured logging
-- [x] Graceful shutdown
-- [x] Public URL ready (Railway / Render config)
-
----
-
-## Cấu Trúc
-
+```text
+C:\code\LQM-Batch02-Day9_Multi-Agent_MCP-A2A
 ```
+
+The original Day 9 project runs distributed A2A services:
+
+```text
+Customer Agent -> Law Agent -> Tax Agent / Compliance Agent -> Aggregate
+```
+
+For this Day 12 final project, the same flow is adapted into an in-process
+engine so the service remains small, Docker-friendly, and easy to deploy.
+
+## Checklist
+
+- [x] Multi-stage Dockerfile
+- [x] Docker Compose with agent + Redis
+- [x] `.dockerignore`
+- [x] `GET /health`
+- [x] `GET /ready`
+- [x] API key authentication
+- [x] Rate limiting
+- [x] Monthly cost guard
+- [x] Config from environment variables
+- [x] Structured JSON logging
+- [x] Graceful shutdown
+- [x] Conversation history with Redis/in-memory fallback
+- [x] Day 9 legal multi-agent flow
+- [x] Railway and Render config files
+
+## Structure
+
+```text
 06-lab-complete/
 ├── app/
-│   ├── main.py         # Entry point — kết hợp tất cả
-│   ├── config.py       # 12-factor config
-│   ├── auth.py         # API Key + JWT
-│   ├── rate_limiter.py # Rate limiting
-│   └── cost_guard.py   # Budget protection
-├── Dockerfile          # Multi-stage, production-ready
-├── docker-compose.yml  # Full stack
-├── railway.toml        # Deploy Railway
-├── render.yaml         # Deploy Render
-├── .env.example        # Template
+│   ├── __init__.py
+│   ├── main.py          # FastAPI entry point
+│   ├── config.py        # 12-factor config
+│   ├── auth.py          # API key authentication
+│   ├── rate_limiter.py  # Redis-backed rate limiting with memory fallback
+│   ├── cost_guard.py    # Monthly budget protection
+│   ├── session_store.py # Redis-backed conversation history
+│   └── legal_agents.py  # Day 9 legal multi-agent flow
+├── utils/
+│   └── mock_llm.py
+├── Dockerfile
+├── docker-compose.yml
+├── railway.toml
+├── render.yaml
+├── .env.example
 ├── .dockerignore
 └── requirements.txt
 ```
 
----
+## Run Locally
 
-## Chạy Local
+PowerShell:
 
-```bash
-# 1. Setup
-cp .env.example .env
+```powershell
+cd C:\code\lqm-day12_ha-tang-cloud_va_deployment\06-lab-complete
 
-# 2. Chạy với Docker Compose
-docker compose up
+$env:AGENT_API_KEY = "YOUR_AGENT_API_KEY"
+$env:PORT = "8010"
+$env:RATE_LIMIT_PER_MINUTE = "10"
+$env:MONTHLY_BUDGET_USD = "10.0"
 
-# 3. Test
-curl http://localhost/health
-
-# 4. Lấy API key từ .env, test endpoint
-API_KEY=$(grep AGENT_API_KEY .env | cut -d= -f2)
-curl -H "X-API-Key: $API_KEY" \
-     -X POST http://localhost/ask \
-     -H "Content-Type: application/json" \
-     -d '{"question": "What is deployment?"}'
+python -m uvicorn app.main:app --host 0.0.0.0 --port 8010
 ```
 
----
+In another terminal:
 
-## Deploy Railway (< 5 phút)
-
-```bash
-# Cài Railway CLI
-npm i -g @railway/cli
-
-# Login và deploy
-railway login
-railway init
-railway variables set OPENAI_API_KEY=sk-...
-railway variables set AGENT_API_KEY=your-secret-key
-railway up
-
-# Nhận public URL!
-railway domain
+```powershell
+Invoke-RestMethod -Method GET -Uri "http://localhost:8010/health"
+Invoke-RestMethod -Method GET -Uri "http://localhost:8010/ready"
 ```
 
----
+Ask the multi-agent legal system:
 
-## Deploy Render
+```powershell
+Invoke-RestMethod -Method POST `
+  -Uri "http://localhost:8010/ask" `
+  -Headers @{ "X-API-Key" = "YOUR_AGENT_API_KEY" } `
+  -ContentType "application/json" `
+  -Body '{"user_id":"student","question":"If a company breaks a contract and avoids taxes, what are the legal and regulatory consequences?"}'
+```
 
-1. Push repo lên GitHub
-2. Render Dashboard → New → Blueprint
-3. Connect repo → Render đọc `render.yaml`
-4. Set secrets: `OPENAI_API_KEY`, `AGENT_API_KEY`
-5. Deploy → Nhận URL!
+Expected response includes:
 
----
+- `answer`
+- `session_id`
+- `trace_id`
+- `specialists.tax`
+- `specialists.compliance`
+- `usage.rate_limit`
+- `usage.budget`
 
-## Kiểm Tra Production Readiness
+## Conversation History
 
-```bash
+Use the returned `session_id`:
+
+```powershell
+Invoke-RestMethod -Method GET `
+  -Uri "http://localhost:8010/sessions/<session_id>/history" `
+  -Headers @{ "X-API-Key" = "YOUR_AGENT_API_KEY" }
+```
+
+## Docker Compose
+
+Create `.env.local` from `.env.example`, then run:
+
+```powershell
+docker compose up --build
+```
+
+Test:
+
+```powershell
+Invoke-RestMethod -Method GET -Uri "http://localhost:8000/health"
+```
+
+## Production Readiness Check
+
+```powershell
+$env:PYTHONIOENCODING = "utf-8"
 python check_production_ready.py
 ```
 
-Script này kiểm tra tất cả items trong checklist và báo cáo những gì còn thiếu.
+Expected:
+
+```text
+20/20 checks passed
+```
+
+## Deploy
+
+Railway:
+
+```powershell
+railway login
+railway init
+railway variables set AGENT_API_KEY=your-secret-key
+railway variables set MONTHLY_BUDGET_USD=10
+railway up
+railway domain
+```
+
+Render:
+
+1. Push the repository to GitHub.
+2. Create a Render Blueprint.
+3. Connect this repo.
+4. Set `AGENT_API_KEY` and other secrets in the dashboard.
+5. Deploy.
